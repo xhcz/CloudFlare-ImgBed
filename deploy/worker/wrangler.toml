@@ -17,6 +17,7 @@ main = "index.js"
 compatibility_date = "2024-08-21"
 # 让 Worker 对自身 zone 的 fetch() 走公网入口，不要直连 origin。
 compatibility_flags = ["global_fetch_strictly_public"]
+workers_dev = true
 
 # 静态资源（前端文件）
 [assets]
@@ -28,7 +29,9 @@ not_found_handling = "single-page-application"
 [images]
 binding = "IMAGES"
 
+# Production guard: require admin and upload credentials before enabling the application.
 [vars]
+IMGBED_REQUIRE_CONFIGURED_AUTH = "true"
 # AI_CONFIG_SECRET 请配置为 Secret，值为至少 32 个字符的随机密钥。
 # TG_BOT_TOKEN = ""
 # TG_CHAT_ID = ""
@@ -42,6 +45,6 @@ binding = "IMAGES"
 # binding = "img_r2"
 # bucket_name = ""
 
-# [[kv_namespaces]]
-# binding = "img_url"
-# id = ""
+[[kv_namespaces]]
+binding = "img_url"
+id = "5e9f8ff7f98b4f5bb0133321fda9ad33"
