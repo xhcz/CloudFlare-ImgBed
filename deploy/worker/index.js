@@ -46,18 +46,24 @@ import * as apiAuthLogout from '../../functions/api/auth/logout.js';
 import * as apiAuthResetAuth from '../../functions/api/auth/resetAuth.js';
 import * as apiAuthSessionCheck from '../../functions/api/auth/sessionCheck.js';
 import * as apiBingWallpaper_index from '../../functions/api/bing/wallpaper/index.js';
+import * as apiManageAccounts from '../../functions/api/manage/accounts.js';
 import * as apiManageApiTokens from '../../functions/api/manage/apiTokens.js';
+import * as apiManageClaims from '../../functions/api/manage/claims.js';
 import * as apiManageExpiry from '../../functions/api/manage/expiry.js';
 import * as apiManageList from '../../functions/api/manage/list.js';
 import * as apiManageQuota from '../../functions/api/manage/quota.js';
+import * as apiManageVerification_index from '../../functions/api/manage/verification/index.js';
 import * as apiPublicList from '../../functions/api/public/list.js';
+import * as apiVerificationCallback from '../../functions/api/verification/callback.js';
 import * as uploadHuggingfaceCommitUpload from '../../functions/upload/huggingface/commitUpload.js';
 import * as uploadHuggingfaceCompleteMultipart from '../../functions/upload/huggingface/completeMultipart.js';
 import * as uploadHuggingfaceGetUploadUrl from '../../functions/upload/huggingface/getUploadUrl.js';
 import * as apiChannels from '../../functions/api/channels.js';
+import * as apiClaims from '../../functions/api/claims.js';
 import * as apiDirectoryTree from '../../functions/api/directoryTree.js';
 import * as apiFetchRes from '../../functions/api/fetchRes.js';
 import * as apiUserConfig from '../../functions/api/userConfig.js';
+import * as apiVerification_index from '../../functions/api/verification/index.js';
 import * as random_index from '../../functions/random/index.js';
 import * as upload_index from '../../functions/upload/index.js';
 import * as apiManageBlockCatchAll from '../../functions/api/manage/block/[[path]].js';
@@ -67,6 +73,7 @@ import * as apiManageMoveCatchAll from '../../functions/api/manage/move/[[path]]
 import * as apiManageRenameCatchAll from '../../functions/api/manage/rename/[[path]].js';
 import * as apiManageTagsCatchAll from '../../functions/api/manage/tags/[[path]].js';
 import * as apiManageWhiteCatchAll from '../../functions/api/manage/white/[[path]].js';
+import * as apiAccountsCatchAll from '../../functions/api/accounts/[[path]].js';
 import * as davCatchAll from '../../functions/dav/[[path]].js';
 import * as fileCatchAll from '../../functions/file/[[path]].js';
 
@@ -106,18 +113,24 @@ const routes = [
     { path: '/api/auth/resetAuth', module: apiAuthResetAuth, middlewares: [mw_root, mw_api] },
     { path: '/api/auth/sessionCheck', module: apiAuthSessionCheck, middlewares: [mw_root, mw_api] },
     { path: '/api/bing/wallpaper', module: apiBingWallpaper_index, middlewares: [mw_root, mw_api] },
+    { path: '/api/manage/accounts', module: apiManageAccounts, middlewares: [mw_root, mw_api, mw_api_manage] },
     { path: '/api/manage/apiTokens', module: apiManageApiTokens, middlewares: [mw_root, mw_api, mw_api_manage] },
+    { path: '/api/manage/claims', module: apiManageClaims, middlewares: [mw_root, mw_api, mw_api_manage] },
     { path: '/api/manage/expiry', module: apiManageExpiry, middlewares: [mw_root, mw_api, mw_api_manage] },
     { path: '/api/manage/list', module: apiManageList, middlewares: [mw_root, mw_api, mw_api_manage] },
     { path: '/api/manage/quota', module: apiManageQuota, middlewares: [mw_root, mw_api, mw_api_manage] },
+    { path: '/api/manage/verification', module: apiManageVerification_index, middlewares: [mw_root, mw_api, mw_api_manage] },
     { path: '/api/public/list', module: apiPublicList, middlewares: [mw_root, mw_api] },
+    { path: '/api/verification/callback', module: apiVerificationCallback, middlewares: [mw_root, mw_api] },
     { path: '/upload/huggingface/commitUpload', module: uploadHuggingfaceCommitUpload, middlewares: [mw_root, mw_upload] },
     { path: '/upload/huggingface/completeMultipart', module: uploadHuggingfaceCompleteMultipart, middlewares: [mw_root, mw_upload] },
     { path: '/upload/huggingface/getUploadUrl', module: uploadHuggingfaceGetUploadUrl, middlewares: [mw_root, mw_upload] },
     { path: '/api/channels', module: apiChannels, middlewares: [mw_root, mw_api] },
+    { path: '/api/claims', module: apiClaims, middlewares: [mw_root, mw_api] },
     { path: '/api/directoryTree', module: apiDirectoryTree, middlewares: [mw_root, mw_api] },
     { path: '/api/fetchRes', module: apiFetchRes, middlewares: [mw_root, mw_api] },
     { path: '/api/userConfig', module: apiUserConfig, middlewares: [mw_root, mw_api] },
+    { path: '/api/verification', module: apiVerification_index, middlewares: [mw_root, mw_api] },
     { path: '/random', module: random_index, middlewares: [mw_root, mw_random] },
     { path: '/upload', module: upload_index, middlewares: [mw_root, mw_upload] },
     { path: '/api/manage/block/', module: apiManageBlockCatchAll, middlewares: [mw_root, mw_api, mw_api_manage], catchAll: true },
@@ -127,6 +140,7 @@ const routes = [
     { path: '/api/manage/rename/', module: apiManageRenameCatchAll, middlewares: [mw_root, mw_api, mw_api_manage], catchAll: true },
     { path: '/api/manage/tags/', module: apiManageTagsCatchAll, middlewares: [mw_root, mw_api, mw_api_manage], catchAll: true },
     { path: '/api/manage/white/', module: apiManageWhiteCatchAll, middlewares: [mw_root, mw_api, mw_api_manage], catchAll: true },
+    { path: '/api/accounts/', module: apiAccountsCatchAll, middlewares: [mw_root, mw_api], catchAll: true },
     { path: '/dav/', module: davCatchAll, middlewares: [mw_root, mw_dav], catchAll: true },
     { path: '/file/', module: fileCatchAll, middlewares: [mw_root, mw_file], catchAll: true },
 ];

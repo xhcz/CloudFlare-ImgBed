@@ -80,6 +80,19 @@ jobs:
           EXPIRY_CLEANUP_CRON: ${{ secrets.EXPIRY_CLEANUP_CRON }}
         run: node deploy/worker/generate-toml.js
 
+      - name: Apply account and upload routing schema
+        if: steps.check.outputs.skip != 'true'
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$D1_DATABASE_ID" ]; then
+            for migration in account_registration registration_bots file_claims upload_routing; do
+              npx --yes wrangler@4 d1 execute img_d1 --remote --config deploy/worker/wrangler.toml --file "database/migrations/$migration.sql"
+            done
+          fi
+
       - name: Deploy to Cloudflare Workers
         if: steps.check.outputs.skip != 'true'
         uses: cloudflare/wrangler-action@v3

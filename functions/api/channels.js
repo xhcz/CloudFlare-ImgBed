@@ -5,6 +5,7 @@
 import { fetchUploadConfig } from '../utils/sysConfig.js';
 import { getUploadConfig } from './manage/sysConfig/upload.js';
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { currentAccount } from '../utils/registration.js';
 import { dualAuthCheck } from '../utils/auth/dualAuth.js';
 
 export async function onRequest(context) {
@@ -17,7 +18,8 @@ export async function onRequest(context) {
     // 双重鉴权检查
     const url = new URL(request.url);
     const { authorized } = await dualAuthCheck(env, url, request);
-    if (!authorized) {
+    const includeDisabled = url.searchParams.get('includeDisabled') === 'true';
+    if (!authorized && (includeDisabled || !await currentAccount(context))) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
@@ -25,7 +27,6 @@ export async function onRequest(context) {
     }
 
     try {
-        const includeDisabled = url.searchParams.get('includeDisabled') === 'true';
 
         let uploadConfig;
         if (includeDisabled) {
@@ -64,6 +65,8 @@ export async function onRequest(context) {
                 type: 'WebDAV'
             }))
         };
+
+        if (env.img_d1 && !env.img_url?.get) channels.auto = [];
 
         return new Response(JSON.stringify(channels), {
             status: 200,

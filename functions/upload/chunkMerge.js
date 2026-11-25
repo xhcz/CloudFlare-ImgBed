@@ -36,6 +36,9 @@ export async function handleChunkMerge(context) {
         }
 
         const sessionInfo = JSON.parse(sessionData);
+        if ((sessionInfo.ownerAccountId || null) !== (context.data?.uploadAccount?.id || null)) {
+            return createResponse('Upload session belongs to a different account', { status: 403 });
+        }
         // 未重复发送类型时沿用会话中的明确类型，再对通用值按文件名兜底。
         originalFileType = resolveFileType(originalFileName, originalFileType || sessionInfo.originalFileType);
 
@@ -54,13 +57,16 @@ export async function handleChunkMerge(context) {
         }
 
         // 使用会话中的上传渠道，或者从URL参数获取
-        uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
+        uploadChannel = (sessionInfo.autoRouted ? sessionInfo.uploadChannel : url.searchParams.get('uploadChannel')) || sessionInfo.uploadChannel || 'telegram';
         if (uploadChannel === 'webdav') {
             return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
         }
 
         // 获取指定的渠道名称（优先URL参数，其次会话信息）
-        const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
+        const channelName = (sessionInfo.autoRouted ? sessionInfo.channelName : url.searchParams.get('channelName')) || sessionInfo.channelName || '';
+        if (sessionInfo.autoRouted && !context.uploadConfig[uploadChannel]?.channels?.some(channel => channel.name === channelName)) {
+            return createResponse('Reserved storage channel is unavailable', { status: 503 });
+        }
         context.specifiedChannelName = channelName;
 
         // 文件有效期由后端按设置决定（合并请求需携带与初始化时相同的 expire 参数）
@@ -176,6 +182,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
 
         // 构建基础metadata
         const metadata = {
+            ...(context.data?.uploadAccount ? { OwnerAccountId: context.data.uploadAccount.id } : {}),
             FileName: originalFileName,
             FileType: originalFileType,
             FileSize: '0', // 会在最终合并后更新

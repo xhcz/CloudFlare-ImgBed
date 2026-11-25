@@ -3,12 +3,18 @@ import '@sentry/tracing';
 import { fetchOthersConfig } from "./sysConfig";
 import { checkDatabaseConfig as checkDbConfig } from './databaseAdapter.js';
 
-let disableTelemetry = false;
+function hasPrivateRequestData(request) {
+  const url = new URL(request.url);
+  return request.headers.has('Cookie') || request.headers.has('Authorization')
+    || request.headers.has('authCode') || url.searchParams.has('authCode')
+    || /^\/api\/(?:manage\/)?(?:accounts|verification|claims|auth)(?:\/|$)/.test(url.pathname);
+}
 
 export async function errorHandling(context) {
+  if (hasPrivateRequestData(context.request)) return context.next();
   // 读取KV中的设置
   const othersConfig = await fetchOthersConfig(context.env);
-  disableTelemetry = !othersConfig.telemetry.enabled;
+  const disableTelemetry = !othersConfig.telemetry.enabled;
 
   const env = context.env;
   if (!disableTelemetry) {
@@ -29,9 +35,10 @@ export async function errorHandling(context) {
 }
 
 export async function telemetryData(context) {
+  if (hasPrivateRequestData(context.request)) return context.next();
   // 读取KV中的设置
   const othersConfig = await fetchOthersConfig(context.env);
-  disableTelemetry = !othersConfig.telemetry.enabled;
+  const disableTelemetry = !othersConfig.telemetry.enabled;
   
   if (!disableTelemetry) {
     try {

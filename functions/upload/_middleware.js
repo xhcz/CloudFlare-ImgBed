@@ -1,5 +1,12 @@
 import { errorHandling, telemetryData, checkDatabaseConfig } from '../utils/middleware';
 
+import { currentAccount } from '../utils/registration.js';
+
+async function identifyUploader(context) {
+    context.data.uploadAccount = await currentAccount(context);
+    return context.next();
+}
+
 // CORS 跨域响应头
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -19,4 +26,4 @@ async function handleOptions(context) {
     return context.next();
 }
 
-export const onRequest = [checkDatabaseConfig, handleOptions, errorHandling, telemetryData];
+export const onRequest = [checkDatabaseConfig, handleOptions, errorHandling, identifyUploader, telemetryData];

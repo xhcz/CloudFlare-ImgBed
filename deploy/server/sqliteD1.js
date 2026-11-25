@@ -20,6 +20,18 @@ export class SqliteD1 {
         this.db.exec(sql);
     }
 
+    async batch(statements) {
+        return this.db.transaction(() => statements.map(statement => {
+            if (statement._db !== this.db) throw new Error('Statement belongs to another database');
+            const prepared = this.db.prepare(statement._sql);
+            if (prepared.reader) {
+                return { success: true, results: prepared.all(...statement._params) };
+            }
+            const info = prepared.run(...statement._params);
+            return { success: true, results: [], meta: { changes: info.changes, last_row_id: info.lastInsertRowid } };
+        }))();
+    }
+
     /**
      * 模拟 D1 的 prepare 方法
      * 返回一个具有 bind/first/all/run 方法的对象

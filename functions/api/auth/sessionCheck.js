@@ -1,3 +1,4 @@
+import { currentAccount } from '../../utils/registration.js';
 import { validateAnySession } from "../../utils/auth/sessionManager.js";
 import { fetchSecurityConfig } from "../../utils/sysConfig.js";
 
@@ -17,7 +18,7 @@ export async function onRequestGet(context) {
         console.error('Session check failed because security config could not be loaded:', error);
         return new Response(JSON.stringify({ error: 'Security config unavailable' }), {
             status: 503,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
         });
     }
     const adminUsername = securityConfig.auth.admin.adminUsername;
@@ -29,15 +30,16 @@ export async function onRequestGet(context) {
 
     // 检查会话
     const sessionResult = await validateAnySession(env, request);
-    if (sessionResult.valid) {
+    const account = sessionResult.valid ? null : await currentAccount(context);
+    if (sessionResult.valid || account) {
         return new Response(JSON.stringify({
             valid: true,
-            authType: sessionResult.session.authType,
+            authType: account ? 'user' : sessionResult.session.authType,
             adminRequired,
             userRequired,
         }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
         });
     }
 
@@ -47,6 +49,6 @@ export async function onRequestGet(context) {
         userRequired,
     }), {
         status: 200, // 不再返回 401，让前端根据字段判断
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
     });
 }

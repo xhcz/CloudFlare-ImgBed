@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>我的账号 · 图床</title><link rel="stylesheet" href="/account/panel.css"><script type="module" src="/account/user.js"></script></head>
+<body><main><nav><a href="/">返回上传</a></nav><h1>我的账号</h1><p role="status" id="notice"></p>
+<section id="guest" hidden><h2>账号登录</h2><form id="login"><label>用户名<input name="username" autocomplete="username" required></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><button>登录</button></form>
+<details><summary>注册账号</summary><form id="register"><label>用户名<input name="username" autocomplete="username" required></label><label>密码<input name="password" type="password" autocomplete="new-password" required></label><p id="availability"></p><button>提交注册</button></form></details></section>
+<section id="application" hidden><h2>注册进度</h2><p id="state"></p><div id="verification"></div><button id="refresh">刷新状态</button></section>
+<section id="member" hidden><h2 id="identity"></h2><button id="logout">退出登录</button><h2>我的文件</h2><ul id="files"></ul><h2>文件认领</h2><form id="claim"><label>文件 ID<input name="fileId" required></label><label>上传凭证或归属说明<textarea name="evidence" required></textarea></label><button>提交认领</button></form><ul id="claims"></ul></section>
+</main></body></html>

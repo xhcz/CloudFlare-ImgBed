@@ -1,3 +1,4 @@
+import { routeCandidates, reserveRoute, releaseRoute } from '../utils/uploadRouting.js';
 import { createS3Client } from '../utils/storage/s3Client.js';
 import { userAuthCheck, UnauthorizedResponse } from "../utils/auth/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig, fetchPageConfig } from "../utils/sysConfig";
@@ -180,6 +181,7 @@ async function processFileUpload(context, formdata = null) {
     const normalizedFolder = uploadFolder;
 
     const metadata = {
+        ...(context.data?.uploadAccount ? { OwnerAccountId: context.data.uploadAccount.id } : {}),
         FileName: fileName,
         FileType: fileType,
         FileSize: fileSize,
@@ -232,6 +234,37 @@ async function processFileUpload(context, formdata = null) {
     /* ====================================不同渠道上传======================================= */
     // 出错是否切换渠道自动重试，默认开启
     const autoRetry = url.searchParams.get('autoRetry') === 'false' ? false : true;
+
+    if (urlParamUploadChannel === 'auto') {
+        const handlers = {
+            cfr2: uploadFileToCloudflareR2, s3: uploadFileToS3, discord: uploadFileToDiscord,
+            huggingface: uploadFileToHuggingFace, webdav: uploadFileToWebDAV,
+            telegram: (ctx, id, meta, link) => uploadFileToTelegram(ctx, id, meta, fileExt, fileName, fileType, link)
+        };
+        let choices = routeCandidates(context, file.size, false);
+        let lastFailure = createResponse('No eligible storage channel for this file', { status: 503 });
+        while (choices.length) {
+            const reservation = crypto.randomUUID();
+            const route = await reserveRoute(context, choices, file.size, reservation);
+            if (!route) break;
+            try {
+                // Telegram may rename the file in its form. Isolate each attempt.
+                const attemptForm = new FormData();
+                for (const [key, value] of formdata) attemptForm.append(key, value);
+                const attempt = { ...context, formdata: attemptForm, specifiedChannelName: route.name };
+                const result = await handlers[route.type](attempt, fullId, { ...metadata }, returnLink);
+                if (result.ok || !autoRetry) return result;
+                lastFailure = result;
+            } catch (error) {
+                if (!autoRetry) throw error;
+                lastFailure = createResponse('Storage upload failed', { status: 502 });
+            } finally {
+                await releaseRoute(context.env, reservation);
+            }
+            choices = choices.filter(item => item !== route);
+        }
+        return lastFailure;
+    }
 
     let err = '';
     // 上传到不同渠道

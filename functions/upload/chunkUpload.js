@@ -1,3 +1,4 @@
+import { routeCandidates, reserveRoute, releaseRoute } from '../utils/uploadRouting.js';
 import { createS3Client } from '../utils/storage/s3Client.js';
 /* ======= 客户端分块上传处理 ======= */
 import { createResponse, checkUploadFormat, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId, endUpload } from './uploadTools';
@@ -13,6 +14,7 @@ export async function initializeChunkedUpload(context) {
     const { request, env, url } = context;
     const db = getDatabase(env);
 
+    let reservationId;
     try {
         // 解析表单数据
         const formdata = await request.formData();
@@ -38,15 +40,27 @@ export async function initializeChunkedUpload(context) {
         const ipAddress = await getIPAddress(env, uploadIp, context.securityConfig);
 
         // 获取上传渠道
-        const uploadChannel = url.searchParams.get('uploadChannel') || 'telegram';
+        let uploadChannel = url.searchParams.get('uploadChannel') || 'telegram';
         if (uploadChannel === 'webdav') {
             return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
         }
         // 获取指定的渠道名称
-        const channelName = url.searchParams.get('channelName') || '';
+        let channelName = url.searchParams.get('channelName') || '';
+        if (uploadChannel === 'auto') {
+            const bytes = Number(formdata.get('originalFileSize'));
+            if (!Number.isSafeInteger(bytes) || bytes <= 0) {
+                return createResponse('Automatic chunk routing requires originalFileSize in bytes', { status: 400 });
+            }
+            const route = await reserveRoute(context, routeCandidates(context, bytes, true), bytes, uploadId);
+            if (!route) return createResponse('No eligible chunk storage channel', { status: 503 });
+            reservationId = uploadId;
+            uploadChannel = route.type;
+            channelName = route.name;
+        }
 
         // 存储上传会话信息
         const sessionInfo = {
+            ownerAccountId: context.data?.uploadAccount?.id || null,
             uploadId,
             originalFileName,
             originalFileType,
@@ -56,6 +70,7 @@ export async function initializeChunkedUpload(context) {
             uploadIp,
             ipAddress,
             status: 'initialized',
+            autoRouted: Boolean(reservationId),
             createdAt: timestamp,
             expiresAt: timestamp + 3600000 // 1小时过期
         };
@@ -83,6 +98,7 @@ export async function initializeChunkedUpload(context) {
         });
 
     } catch (error) {
+        if (reservationId) await releaseRoute(env, reservationId);
         return createResponse(`Error: Failed to initialize chunked upload - ${error.message}`, { status: 500 });
     }
 }
@@ -116,6 +132,9 @@ export async function handleChunkUpload(context) {
         }
 
         const sessionInfo = JSON.parse(sessionData);
+        if ((sessionInfo.ownerAccountId || null) !== (context.data?.uploadAccount?.id || null)) {
+            return createResponse('Upload session belongs to a different account', { status: 403 });
+        }
 
         // 验证会话信息
         if (sessionInfo.originalFileName !== originalFileName ||
@@ -132,14 +151,17 @@ export async function handleChunkUpload(context) {
         }
 
         // 获取上传渠道
-        const uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
+        const uploadChannel = (sessionInfo.autoRouted ? sessionInfo.uploadChannel : url.searchParams.get('uploadChannel')) || sessionInfo.uploadChannel || 'telegram';
         if (uploadChannel === 'webdav') {
             return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
         }
         // 获取指定的渠道名称
-        const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
+        const channelName = (sessionInfo.autoRouted ? sessionInfo.channelName : url.searchParams.get('channelName')) || sessionInfo.channelName || '';
 
         // 将渠道名称存入 context
+        if (sessionInfo.autoRouted && !context.uploadConfig[uploadChannel]?.channels?.some(channel => channel.name === channelName)) {
+            return createResponse('Reserved storage channel is unavailable', { status: 503 });
+        }
         context.specifiedChannelName = channelName;
 
         // 立即创建分块记录，标记为"uploading"状态
@@ -194,6 +216,10 @@ export async function handleCleanupRequest(context, uploadId, totalChunks) {
             }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 
+        const session = await getDatabase(context.env).get('upload_session_' + uploadId);
+        if (!session || (JSON.parse(session).ownerAccountId || null) !== (context.data?.uploadAccount?.id || null)) {
+            return createResponse('Unknown upload session', { status: 403 });
+        }
         // 强制清理所有相关数据
         await forceCleanupUpload(context, uploadId, totalChunks);
 
@@ -1136,6 +1162,8 @@ export async function cleanupUploadSession(env, uploadId) {
         const db = getDatabase(env);
 
         const sessionKey = `upload_session_${uploadId}`;
+        const session = await db.get(sessionKey);
+        if (session && JSON.parse(session).autoRouted) await releaseRoute(env, uploadId);
         await db.delete(sessionKey);
         console.log(`Cleaned up upload session for ${uploadId}`);
     } catch (cleanupError) {
@@ -1152,6 +1180,7 @@ export async function forceCleanupUpload(context, uploadId, totalChunks) {
         // 读取 session 信息
         const sessionKey = `upload_session_${uploadId}`;
         const sessionRecord = await db.get(sessionKey);
+        if (sessionRecord && JSON.parse(sessionRecord).autoRouted) await releaseRoute(env, uploadId);
         const uploadChannel = sessionRecord ? JSON.parse(sessionRecord).uploadChannel : 'cfr2'; // 默认使用 cfr2
 
         // 清理 multipart upload信息

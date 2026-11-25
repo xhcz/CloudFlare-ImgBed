@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+
+const db = new DatabaseSync(':memory:');
+db.exec('CREATE TABLE files(id TEXT PRIMARY KEY,metadata TEXT,timestamp INTEGER)');
+const migration = readFileSync(new URL('../../database/migrations/file_claims.sql',import.meta.url),'utf8');
+db.exec(migration);
+db.exec(migration);
+db.exec("INSERT INTO files VALUES('photo','{}',100)");
+const claim = db.prepare("INSERT INTO file_claims VALUES(?,'photo',?,?,'original upload evidence','pending',1)");
+claim.run('stale',99,'owner1');
+claim.run('valid',100,'owner2');
+assert.throws(() => db.exec("UPDATE file_claims SET status='approved' WHERE id='stale'"));
+db.exec("UPDATE file_claims SET status='approved' WHERE id='valid'");
+assert.equal(db.prepare("SELECT status FROM file_claims WHERE id='stale'").get().status,'rejected');
+assert.equal(db.prepare("SELECT json_extract(metadata,'$.OwnerAccountId') AS owner FROM files").get().owner,'owner2');
+assert.throws(() => db.exec("INSERT OR REPLACE INTO files VALUES('photo','{}',101)"));
+db.close();
+console.log('File claims verified against stale versions, competing approvals and replacement uploads.');

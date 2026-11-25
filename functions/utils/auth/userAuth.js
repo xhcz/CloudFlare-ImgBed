@@ -3,6 +3,7 @@
  * 基于统一认证核心，保持原有导出签名不变
  */
 
+import { currentAccount } from '../registration.js';
 import { authenticate, AUTH_SCOPE } from './authCore.js';
 
 /**
@@ -21,7 +22,11 @@ export async function userAuthCheck(env, url, request, requiredPermission = null
         requiredPermission,
         authScope: AUTH_SCOPE.USER,
     });
-    return result.authorized;
+    if (result.authorized) return true;
+    if (requiredPermission !== 'upload') return false;
+    const origin = request.headers.get('Origin');
+    if (origin && origin !== url.origin) return false;
+    return Boolean(await currentAccount({ env, request }));
 }
 
 export function UnauthorizedResponse(reason) {

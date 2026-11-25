@@ -75,6 +75,13 @@ export async function onRequestPost(context) {
             });
         }
 
+        const db = getDatabase(env);
+        if (await db.get(fullId) !== null) return createResponse('File ID already exists', {status:409});
+        if (env.img_d1 && !env.img_url?.get) {
+            const valid = await env.img_d1.prepare('SELECT 1 FROM hf_upload_intents WHERE file_path=? AND file_id=? AND account_id=? AND sha256=? AND file_size=? AND channel_name=? AND expires_at>?')
+                .bind(filePath, fullId, context.data?.uploadAccount?.id || '', sha256, fileSize, hfChannel.name || '', Date.now()).first();
+            if (!valid) return createResponse('Invalid upload session', {status:403});
+        }
         // 文件有效期由后端按设置决定（提交请求需携带与获取上传地址时相同的 expire 参数）；
         // 在提交远端文件之前校验，被拒绝的请求不会在 HuggingFace 留下没有记录的文件
         const expiry = await resolveUploadExpiry({ env, request, url });
@@ -110,6 +117,7 @@ export async function onRequestPost(context) {
 
         // 构建 metadata
         const metadata = {
+            ...(context.data?.uploadAccount ? { OwnerAccountId: context.data.uploadAccount.id } : {}),
             FileName: fileName || fullId,
             FileType: resolveFileType(fileName || fullId, fileType),
             Channel: "HuggingFace",
@@ -140,7 +148,6 @@ export async function onRequestPost(context) {
         }
 
         // 写入数据库
-        const db = getDatabase(env);
         await db.put(fullId, "", { metadata });
 
         // 结束上传（更新索引等）

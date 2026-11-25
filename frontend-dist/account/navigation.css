@@ -1,0 +1,1 @@
+.account-navigation{position:fixed;z-index:1000;bottom:max(12px,env(safe-area-inset-bottom));left:12px;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:1em;padding:.35em .8em;font:14px/1.5 system-ui;text-decoration:none}

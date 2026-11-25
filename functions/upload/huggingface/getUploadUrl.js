@@ -114,6 +114,13 @@ export async function onRequestPost(context) {
         const uploadInfo = await huggingfaceAPI.getLfsUploadInfo(fileSize, filePath, sha256, fileSample);
         rewriteMultipartCompletionUrl(url, uploadInfo);
 
+        if (env.img_d1 && !env.img_url?.get) {
+            await env.img_d1.batch([
+                env.img_d1.prepare('DELETE FROM hf_upload_intents WHERE expires_at <= ?').bind(Date.now()),
+                env.img_d1.prepare('INSERT INTO hf_upload_intents(file_path,file_id,account_id,sha256,file_size,channel_name,expires_at) VALUES(?,?,?,?,?,?,?)')
+                    .bind(filePath, fullId, context.data?.uploadAccount?.id || '', sha256, fileSize, hfChannel.name || '', Date.now() + 86400000)
+            ]);
+        }
         // 返回上传信息
         return createResponse(JSON.stringify({
             success: true,
